@@ -117,4 +117,35 @@ public class Util {
             );
         }
     }
+
+    /**
+     * Runs the given code on a dedicated thread with a large (8 MiB) stack
+     * and returns whatever it threw. Tests that parse documents nested up to
+     * the default maximum nesting depth use this, so that their outcome does
+     * not depend on the (possibly small, e.g. -Xss512k) stack size of the
+     * thread running the tests.
+     * @param body the code to run
+     * @return the Throwable thrown by the code, or null if it completed normally
+     */
+    public static Throwable throwableFromLargeStack(final Runnable body) {
+        final Throwable[] thrown = new Throwable[1];
+        Thread worker = new Thread(null, new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    body.run();
+                } catch (Throwable t) {
+                    thrown[0] = t;
+                }
+            }
+        }, "json-large-stack-test", 8L * 1024L * 1024L);
+        worker.start();
+        try {
+            worker.join();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError("Interrupted while waiting for the large stack test thread: " + e);
+        }
+        return thrown[0];
+    }
 }
